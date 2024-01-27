@@ -4,7 +4,7 @@
 #
 #
 # (C) Saeid Haghighatshoar
-# email: saeid.haghighatshoar@synsense.ai
+# email: haghighatshoar@gmail.com
 #
 #
 # last update: 26.01.2024
