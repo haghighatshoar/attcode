@@ -155,7 +155,7 @@ class Decoder(torch.nn.Module):
 
             # build the multi-head attention layer
             embed_dim = inout_dim * num_heads
-            att = Attention(embed_dim=embed_dim, num_heads=num_heads, bias=False)
+            att = Attention(embed_dim=embed_dim, num_heads=num_heads, bias=False, batch_first=True)
 
             # update the input dim for the next layer
             inout_dim = embed_dim

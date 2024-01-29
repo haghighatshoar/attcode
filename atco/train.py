@@ -127,7 +127,7 @@ def train_decoder():
     enc = Encoder(k=k, n=n)
 
     # decoder
-    num_att_heads = [2]
+    num_att_heads = [5,]
     num_tokens = 20
 
     dec = Decoder(
