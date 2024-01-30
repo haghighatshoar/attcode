@@ -57,7 +57,13 @@ class Trainer:
             encoded_bits = self.enc(input_bits)
 
             # compute noisy bits
-            noisy_output = self.chan(encoded_bits)
+            # NOTE: here as a test/validation, we put a condition that from each 100 only a single one passes through
+            # the channel noise and see how this affects things
+            if (epoch + 1)%10 == 0:
+                # it is time to throw some noise and see if training has happened
+                noisy_output = self.chan(encoded_bits)
+            else:
+                noisy_output = encoded_bits.copy()
 
             # compute the corresponding LLR
             llr = self.chan.llr(noisy_output)
@@ -125,14 +131,14 @@ def train_decoder():
     # channel info
     eps = 0.1
     chan = BSC(eps=eps)
-    chan_cap = 1 + (eps * np.log2(eps) + (1 - eps) * np.log2(1 - eps))
+    chan_cap = 1 - (-eps * np.log2(eps) - (1 - eps) * np.log2(1 - eps))
 
     # choose code rate
     backoff = 4
     rate = min([chan_cap / backoff, 0.2])
 
     # channel and code info
-    k = 10
+    k = 40
     n = k / rate
     n = int(10 * np.ceil(n / 10))
 
@@ -141,7 +147,7 @@ def train_decoder():
 
     # decoder
     num_att_heads = [10]
-    num_tokens = 10
+    num_tokens = n//10
 
     dec = Decoder(
         k=k,
