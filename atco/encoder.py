@@ -29,8 +29,11 @@ class Encoder:
         # build a random encoding matrix
         # NOTE: we assume that the encoder is a linear one.
         # we also make sure that the encoder matrix has a nonzero determinants
+        
+        # relative sparsity of the code generator matrix
+        sparsity = 0.5
         while True:
-            G = (np.random.randn(n, k) < 0.0).astype(np.int64)
+            G = (np.random.rand(n, k) < sparsity).astype(np.int64)
 
             # first square submatrix
             GG = G[:k, :]

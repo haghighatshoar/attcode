@@ -70,11 +70,11 @@ class Trainer:
             decoded_tokens_one_hot = self.dec(llr)
 
             # compute the one-hot encoding of the original bits/tokens
-            encoded_tokens = encoded_bits.T.reshape(num_batch, self.dec.num_tokens, self.dec.num_token_bits)
-            encoded_token_binary = torch.tensor(
-                data=np.sum(encoded_tokens * 2 ** np.arange(self.dec.num_token_bits).reshape(1, 1, -1), axis=-1))
+            encoded_tokens_binary = encoded_bits.T.reshape(num_batch, self.dec.num_tokens, self.dec.num_token_bits)
+            encoded_tokens_decimal = torch.tensor(
+                data=np.sum(encoded_tokens_binary * 2 ** np.arange(self.dec.num_token_bits-1, -1, step=-1).reshape(1, 1, -1), axis=-1))
 
-            encoded_tokens_one_hot = F.one_hot(encoded_token_binary.reshape(1, -1),
+            encoded_tokens_one_hot = F.one_hot(encoded_tokens_decimal.reshape(1, -1),
                                                num_classes=2 ** self.dec.num_token_bits).reshape(num_batch,
                                                                                                  self.dec.num_tokens,
                                                                                                  -1).float()
@@ -87,11 +87,14 @@ class Trainer:
             opt.step()
             opt.zero_grad()
 
+            #================================================
+            #          compute bit error probability
+            #================================================
             # compute the error probability as well
             # first find the one-hot-encodings with maximum likelihood and encode them as binary strings
-            decoded_one_hot_index = torch.argmax(encoded_tokens_one_hot, axis=-1).numpy()
+            decoded_tokens_decimal = torch.argmax(decoded_tokens_one_hot, axis=-1).numpy()
             decode_str_bits = [''.join([np.binary_repr(num, width=self.dec.num_token_bits) for num in batch_data]) for
-                               batch_data in decoded_one_hot_index]
+                               batch_data in decoded_tokens_decimal]
 
             # join the binary strings and convert them into bits
             decoded_bits = np.array([[int(ch) for ch in bit_string] for bit_string in decode_str_bits],
@@ -99,13 +102,23 @@ class Trainer:
 
             # compute error rate across codeowords in each batch
             bit_err_rate = np.sum(np.abs(decoded_bits.ravel() - encoded_bits.ravel())) / encoded_bits.size
+            
+            #================================================
+            #        compute block error probability
+            #================================================
+            decoded_tokens_binary = decoded_bits.T.reshape(num_batch, self.dec.num_tokens, self.dec.num_token_bits)
+            decoded_tokens_decimal = np.sum(decoded_tokens_binary * (2**np.arange(self.dec.num_token_bits-1,-1,step=-1)).reshape(1,1,-1), axis=-1)
+            
+            token_err_rate = np.sum(decoded_tokens_decimal != encoded_tokens_decimal.numpy())/encoded_tokens_decimal.numel()
+            
 
             # save the loss and track it as well
             loss_vec.append(loss.item())
             log_metric("loss", loss.item())
             log_metric("bit error rate", bit_err_rate)
+            log_metric("token error rate", token_err_rate)
 
-            print(f"epoch: {epoch} / {num_epoch}, loss:{loss.item()}, bit-err-rate:{bit_err_rate}")
+            print(f"epoch: {epoch:5}/{num_epoch:5}, loss:{loss.item():1.5f}, bit-err-rate:{bit_err_rate:0.6f}, token-err-rate:{token_err_rate:0.6f}")
 
 
 def train_decoder():
@@ -115,11 +128,11 @@ def train_decoder():
     chan_cap = 1 + (eps * np.log2(eps) + (1 - eps) * np.log2(1 - eps))
 
     # choose code rate
-    backoff = 3
-    rate = chan_cap / backoff
+    backoff = 4
+    rate = min([chan_cap / backoff, 0.2])
 
     # channel and code info
-    k = 20
+    k = 10
     n = k / rate
     n = int(10 * np.ceil(n / 10))
 
@@ -127,8 +140,8 @@ def train_decoder():
     enc = Encoder(k=k, n=n)
 
     # decoder
-    num_att_heads = [5,]
-    num_tokens = 20
+    num_att_heads = [10]
+    num_tokens = 10
 
     dec = Decoder(
         k=k,
@@ -142,7 +155,7 @@ def train_decoder():
 
     # training
     num_epochs = 100_000
-    num_batch = 10
+    num_batch = 5
     lr = 0.0001
 
     trainer.train(num_epoch=num_epochs, num_batch=num_batch, lr=lr)
